@@ -105,9 +105,9 @@ export const FormulaDagView: React.FC<FormulaDagViewProps> = ({ onRefresh }) => 
       </div>
 
       {/* Main View: Node List & Details */}
-      <div className="grid grid-cols-12 gap-4 flex-1 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 overflow-hidden">
         {/* Node Sequence List */}
-        <div className="col-span-7 bg-slate-950 rounded border border-slate-800 p-3 overflow-auto flex flex-col gap-2">
+        <div className="col-span-1 lg:col-span-7 bg-slate-950 rounded border border-slate-800 p-3 overflow-auto flex flex-col gap-2">
           <div className="text-xs font-semibold text-slate-400 mb-1 flex items-center justify-between">
             <span>Evaluation Sequence (Topological Order)</span>
             <span className="text-[11px] font-normal text-slate-500">Earliest to Latest</span>
@@ -141,7 +141,7 @@ export const FormulaDagView: React.FC<FormulaDagViewProps> = ({ onRefresh }) => 
         </div>
 
         {/* Node Inspector */}
-        <div className="col-span-5 bg-slate-950 rounded border border-slate-800 p-3 overflow-auto flex flex-col">
+        <div className="col-span-1 lg:col-span-5 bg-slate-950 rounded border border-slate-800 p-3 overflow-auto flex flex-col">
           <div className="text-xs font-semibold text-slate-400 mb-3 pb-2 border-b border-slate-800">
             Node Inspector
           </div>

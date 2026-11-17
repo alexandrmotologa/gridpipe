@@ -162,7 +162,7 @@ export const VarianceHeatmap: React.FC<VarianceHeatmapProps> = ({
 
       {/* KPI Cards */}
       {report && (
-        <div className="grid grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
           <div className="bg-slate-950 p-3 rounded border border-slate-800 text-xs">
             <div className="text-slate-500 mb-1">Baseline Total (A)</div>
             <div className="text-sm font-bold font-mono text-slate-200">

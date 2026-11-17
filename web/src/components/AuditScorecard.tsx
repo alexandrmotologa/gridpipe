@@ -84,9 +84,9 @@ export const AuditScorecard: React.FC<AuditScorecardProps> = ({ sheetIdx }) => {
       </div>
 
       {/* Top Quality Score Gauge & Metrics */}
-      <div className="grid grid-cols-12 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
         {/* Main Scorecard Card */}
-        <div className="col-span-4 bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div className="col-span-1 lg:col-span-4 bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
           <div>
             <div className="text-xs font-medium text-slate-400">Overall Quality Index</div>
             <div className="text-3xl font-extrabold font-mono text-white mt-1">
@@ -108,7 +108,7 @@ export const AuditScorecard: React.FC<AuditScorecardProps> = ({ sheetIdx }) => {
         </div>
 
         {/* 4 Pillars Breakdown */}
-        <div className="col-span-8 bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-4 gap-4 text-xs font-mono">
+        <div className="col-span-1 lg:col-span-8 bg-slate-950 p-4 rounded-xl border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
           <div>
             <div className="text-slate-500 mb-1 flex items-center justify-between">
               <span>Completeness</span>

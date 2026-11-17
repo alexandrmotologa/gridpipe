@@ -219,77 +219,82 @@ export const App: React.FC = () => {
       )}
 
       {/* Top Main Navigation Bar */}
-      <header className="h-14 border-b border-slate-800 bg-slate-950/80 backdrop-blur px-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="h-14 border-b border-slate-800 bg-slate-950/80 backdrop-blur px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="flex items-center gap-2 font-bold tracking-tight text-white text-base">
             <div className="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-sky-500/20">
               G
             </div>
-            <span>gridpipe</span>
-            <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
-              Sheet Studio v1.1
+            <span className="hidden xs:inline">gridpipe</span>
+            <span className="hidden sm:inline text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
+              v1.1
             </span>
           </div>
 
           {fileName && (
             <div className="hidden md:flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1 rounded-full text-slate-300">
               <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-              <span className="truncate max-w-[200px]">{fileName}</span>
+              <span className="truncate max-w-[160px] lg:max-w-[240px]">{fileName}</span>
             </div>
           )}
         </div>
 
         {/* Center Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-800 p-1 rounded-lg text-xs">
+        <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/80 border border-slate-800 p-1 rounded-lg text-xs overflow-x-auto scrollbar-none max-w-full">
           <button
             onClick={() => setActiveTab('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+            title="Grid Canvas"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
               activeTab === 'grid' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            Grid Canvas
+            <span className="hidden md:inline">Grid Canvas</span>
           </button>
           <button
             onClick={() => setActiveTab('schema')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+            title="Schema Alignment"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
               activeTab === 'schema' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            Schema Alignment
+            <span className="hidden md:inline">Schema</span>
           </button>
           <button
             onClick={() => setActiveTab('dag')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+            title="Formula DAG"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
               activeTab === 'dag' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <GitCommit className="w-3.5 h-3.5" />
-            Formula DAG
+            <span className="hidden md:inline">Formula DAG</span>
           </button>
           <button
             onClick={() => setActiveTab('variance')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+            title="Reconciliation"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
               activeTab === 'variance' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <GitCompare className="w-3.5 h-3.5" />
-            Reconciliation
+            <span className="hidden md:inline">Reconciliation</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+            title="Quality & Audit"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
               activeTab === 'audit' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            Quality & Audit
+            <span className="hidden md:inline">Quality & Audit</span>
           </button>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <input
             type="file"
             ref={fileInputRef}
@@ -300,39 +305,42 @@ export const App: React.FC = () => {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors"
+            title="Upload File"
           >
             <Upload className="w-3.5 h-3.5" />
-            Upload File
+            <span className="hidden sm:inline">Upload</span>
           </button>
 
           <button
             onClick={handleRunClean}
             disabled={loading || sheets.length === 0}
-            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-600/20"
+            className="px-2.5 sm:px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-600/20"
+            title="Normalize & Synthesize Formulas"
           >
             <Play className="w-3.5 h-3.5 fill-white" />
-            Normalize & Synthesize
+            <span className="hidden sm:inline">Normalize</span>
           </button>
 
           <button
             onClick={handleRunRepair}
             disabled={loading || sheets.length === 0}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-md text-xs flex items-center gap-1.5 transition-colors"
+            className="px-2 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-md text-xs flex items-center gap-1.5 transition-colors"
             title="Scan and heal broken references (#REF!, #VALUE!)"
           >
             <Wrench className="w-3.5 h-3.5 text-amber-400" />
-            Heal Formulas
+            <span className="hidden lg:inline">Heal</span>
           </button>
 
           {/* Export Dropdown */}
           <div className="relative group">
             <button
               disabled={sheets.length === 0}
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5"
+              className="px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5"
+              title="Export Data"
             >
               <Download className="w-3.5 h-3.5 text-sky-400" />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </button>
             <div className="absolute right-0 top-full mt-1 hidden group-hover:block bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 w-44 z-40 text-xs">
               <button

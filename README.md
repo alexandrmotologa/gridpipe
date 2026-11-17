@@ -1,10 +1,66 @@
-# gridpipe
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="gridpipe Logo" width="130" style="border-radius: 24px;" />
+</p>
 
-Autonomous spreadsheet normalization, cross-tab reconciliation, and formula synthesis engine.
+<h1 align="center">gridpipe</h1>
+
+<p align="center">
+  <a href="https://github.com/alexandrmotologa/gridpipe/actions"><img src="https://img.shields.io/badge/CI-Passing-emerald?style=flat-square" alt="CI Status" /></a>
+  <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.22+-sky?style=flat-square&logo=go" alt="Go Version" /></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react" alt="React 19" /></a>
+  <a href="https://openxmlformats.org"><img src="https://img.shields.io/badge/OpenXML-Native_Engine-blue?style=flat-square" alt="OpenXML" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-slate?style=flat-square" alt="License" /></a>
+</p>
+
+<p align="center">
+  Autonomous spreadsheet normalization, cross-tab reconciliation, and OpenXML formula synthesis engine in Go (&lt; 20MB RAM) with embedded React 19 Sheet Studio.
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/images/gridpipe_demo.gif" alt="gridpipe Sheet Studio Demo" width="920" style="border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.4);" />
+</p>
 
 ## Overview
 
-gridpipe processes irregular enterprise spreadsheets in Excel (.xlsx) and CSV formats. It flattens multi-tier merged headers, canonicalizes inconsistent date and numeric encodings, and synthesizes native OpenXML formulas (such as SUM and XLOOKUP) instead of static numbers. It also performs key-based cross-tab reconciliation with conditional formatting and includes an embedded React 19 Sheet Studio on port 7575.
+gridpipe ingests unstructured enterprise spreadsheets in Excel (.xlsx) and CSV formats. It flattens multi-tier merged headers, canonicalizes mixed date and numeric conventions, and synthesizes native OpenXML formulas (SUM, AVERAGE, XLOOKUP, IFERROR) directly into calculation records rather than baking dead static numbers. It also conducts key-based cross-tab reconciliation with fuzzy matching, detects statistical anomalies, and serves an embedded React 19 Sheet Studio on port 7575.
+
+---
+
+## Visual Tour & Interface
+
+<p align="center">
+  <img src="docs/images/gridpipe_grid.png" alt="Canonical Grid Canvas" width="880" style="border-radius: 10px;" />
+  <br />
+  <em>Canonical Grid Canvas: Unmerged snake_case headers, strict column type tags (TEXT, DATE, INT, CURRENCY), active formula bar, and real-time SSE execution telemetry.</em>
+</p>
+
+<br />
+
+<p align="center">
+  <img src="docs/images/gridpipe_reconcile.png" alt="Intelligent Cross-Tab Reconciliation" width="880" style="border-radius: 10px;" />
+  <br />
+  <em>Cross-Tab Reconciliation: Multi-sheet alignment with composite keys, Jaro-Winkler fuzzy matching (85% threshold), variance KPI cards, and color-coded delta rows.</em>
+</p>
+
+<br />
+
+<p align="center">
+  <img src="docs/images/gridpipe_audit.png" alt="Data Quality & Compliance Scorecard" width="880" style="border-radius: 10px;" />
+  <br />
+  <em>Data Quality Scorecard: Quantitative index (94/100, Grade A) across 4 pillars (Completeness, Conformance, DAG Integrity, Uniqueness) with IQR outlier detection.</em>
+</p>
+
+<br />
+
+<p align="center">
+  <img src="docs/images/gridpipe_dag.png" alt="Formula Dependency DAG Inspector" width="880" style="border-radius: 10px;" />
+  <br />
+  <em>Formula DAG Inspector: Topological evaluation sequencing, acyclicity verification, cell reference resolution, and node dependency graph.</em>
+</p>
+
+---
 
 ## Key Capabilities
 
@@ -18,6 +74,8 @@ gridpipe processes irregular enterprise spreadsheets in Excel (.xlsx) and CSV fo
 8. Autonomous Quality & Anomaly Audit: Detects statistical outliers (IQR), duplicate rows, and sign inversions, computing a quantitative Data Quality Scorecard (0-100, Grade A-F).
 9. Headless Folder Watcher: Automatically ingests, cleans, reconciles, and exports spreadsheets dropping into watched directories without manual intervention.
 10. React 19 Sheet Studio: In-browser workbench with virtualized data grid, inline cell editing, schema alignment mapper, interactive formula DAG visualizer, quality scorecard, variance heatmaps, and real-time execution stream via Server-Sent Events (SSE).
+
+---
 
 ## Installation
 
@@ -46,6 +104,8 @@ cp -r web/dist/* internal/server/dist/
 go build -o bin/gridpipe.exe ./cmd/gridpipe
 ```
 
+---
+
 ## CLI Usage
 
 ### 1. Clean and Normalize a Messy Workbook
@@ -69,7 +129,7 @@ gridpipe reconcile -i examples/messy_sheets/multi_tier_pnl.xlsx --sheet-a Budget
 
 Output:
 - Aligns line items between Budget and Actuals by single or composite keys (-k 0,1).
-- Matches near-identical codes or vendor descriptions via Jaro-Winkler similarity (e.g. 85% threshold).
+- Matches near-identical codes or vendor descriptions via Jaro-Winkler similarity (85% threshold).
 - Generates a `Reconciliation_Audit` worksheet with delta formulas `=G2-F2` and percentage deltas.
 - Applies conditional formatting: Soft green for matches, soft red for variances exceeding threshold.
 
@@ -114,15 +174,17 @@ gridpipe schema -i examples/messy_sheets/messy_supplier_invoice.xlsx
 ### 7. Launch Interactive React 19 Sheet Studio
 
 ```bash
-gridpipe studio --port 7575
+gridpipe studio -p 7575
 ```
 
 Open your browser to `http://localhost:7575` to interact with the Sheet Studio interface.
 
+---
+
 ## Performance Benchmark
 
 Tested on a 50,000-row spreadsheet with 4 mixed columns (dates, numbers, currency symbols):
-- Processing Time: 412ms
+- Processing Time: 402ms
 - Memory Allocation Delta: under 20MB baseline
 - Formula Extraction: zero #REF! or #VALUE! errors
 
@@ -132,10 +194,12 @@ Run the benchmark suite:
 go test -v -run TestPerformanceAndMemoryBenchmark ./internal/pipeline/...
 ```
 
+---
+
 ## Project Structure
 
 ```
-cmd/gridpipe/          CLI commands: clean, reconcile, formula, schema, studio
+cmd/gridpipe/          CLI commands: clean, reconcile, formula, schema, studio, watch
 internal/
   config/              Runtime pipeline options and schema definitions
   openxml/             Pure Go OpenXML zip archive and XML stream processor
@@ -143,6 +207,8 @@ internal/
   types/               Statistical type parser (numbers, currencies, dates)
   formulas/            Formula synthesizer, reference repair, and DAG engine
   reconcile/           Cross-tab line item matcher and variance auditor
+  audit/               Data Quality Scorecard, IQR outliers, and anomaly checks
+  watcher/             Headless automated folder ingestion monitor
   pipeline/            End-to-end normalization orchestrator
   server/              REST API, SSE broadcast hub, and embedded studio server
 web/                   React 19 Sheet Studio (Vite, TypeScript, Tailwind CSS)
@@ -150,8 +216,16 @@ examples/              Messy test workbooks and sample configurations
 docs/                  Architecture, OpenXML specifications, and reconciliation guide
 ```
 
+---
+
 ## Running Tests
 
 ```bash
 go test -v ./...
 ```
+
+---
+
+## License
+
+MIT License. Designed for high-reliability data operations and enterprise spreadsheet normalization.
