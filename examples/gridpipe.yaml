@@ -1,0 +1,9 @@
+# gridpipe pipeline configuration
+header_scan_rows: 10
+footnote_scan_rows: 15
+date_target_format: "2006-01-02"
+numeric_locale: "auto"
+trim_footnotes: true
+synthesize_math: true
+repair_broken_refs: true
+variance_epsilon: 0.0001

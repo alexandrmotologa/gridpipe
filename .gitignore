@@ -1,0 +1,43 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+dist/
+
+# Test artifacts and coverage
+*.out
+*.test
+coverage.txt
+coverage.html
+
+# Go workspace and dependencies
+vendor/
+go.work
+go.work.sum
+
+# Node dependencies and build
+web/node_modules/
+web/dist/
+web/.vite/
+web/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Output exports and temporary files
+out/
+tmp/
+*.tmp
