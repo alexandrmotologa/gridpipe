@@ -19,6 +19,35 @@ export interface SheetOverview {
   preview: string[][];
 }
 
+export interface AnomalyIssue {
+  sheet_name: string;
+  cell_ref: string;
+  row: number;
+  col: number;
+  column_name: string;
+  value: string;
+  category: 'OUTLIER' | 'DUPLICATE' | 'SIGN_INVERSION' | 'TYPE_VIOLATION';
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  description: string;
+  suggested?: string;
+}
+
+export interface DataQualityScorecard {
+  overall_score: number;
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  completeness_score: number;
+  conformance_score: number;
+  formula_integrity_score: number;
+  uniqueness_score: number;
+  total_rows: number;
+  total_columns: number;
+  total_cells: number;
+  empty_cells: number;
+  duplicate_rows_count: number;
+  anomalies_count: number;
+  issues: AnomalyIssue[];
+}
+
 export interface NormalizedSheetResult {
   name: string;
   columns: string[];
@@ -43,10 +72,14 @@ export interface NormalizedSheetResult {
     error_reason: string;
   }[];
   formulas_created: number;
+  scorecard?: DataQualityScorecard;
 }
 
 export interface RowVarianceItem {
   key: string;
+  matched_key_b?: string;
+  match_type: 'EXACT' | 'FUZZY' | 'NONE';
+  confidence: number;
   value_a: number;
   value_b: number;
   delta: number;
@@ -60,6 +93,7 @@ export interface ReconciliationReport {
   total_rows_b: number;
   matched_rows: number;
   discrepancies: number;
+  fuzzy_matches: number;
   missing_in_a: number;
   missing_in_b: number;
   sum_value_a: number;

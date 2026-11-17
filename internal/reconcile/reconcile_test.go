@@ -60,7 +60,60 @@ func TestReconcileSheets(t *testing.T) {
 	}
 
 	// Check delta formula on row 1
-	if !strings.Contains(reconciledSheet.Grid[1][3].Formula, "C2-B2") {
-		t.Errorf("row 1 delta formula = %s, want C2-B2", reconciledSheet.Grid[1][3].Formula)
+	if !strings.Contains(reconciledSheet.Grid[1][6].Formula, "F2-E2") {
+		t.Errorf("row 1 delta formula = %s, want F2-E2", reconciledSheet.Grid[1][6].Formula)
+	}
+}
+
+func TestFuzzyReconciliationAndCompositeKeys(t *testing.T) {
+	// Sheet A (Vendor Invoice)
+	// Has slight typo: "ACME-WIDGET-99" instead of "ACME_WIDGET_99"
+	sheetA := &openxml.SheetData{
+		Name:   "Vendor",
+		MaxRow: 3,
+		MaxCol: 3,
+		Grid: [][]openxml.Cell{
+			{{Resolved: "Category"}, {Resolved: "PartNumber"}, {Resolved: "Total"}},
+			{{Resolved: "Hardware"}, {Resolved: "ACME-WIDGET-99"}, {Resolved: "150.00"}},
+			{{Resolved: "Tools"}, {Resolved: "DRILL-X1"}, {Resolved: "80.00"}},
+		},
+	}
+
+	// Sheet B (Internal PO)
+	// Uses underscore: "ACME_WIDGET_99"
+	sheetB := &openxml.SheetData{
+		Name:   "InternalPO",
+		MaxRow: 3,
+		MaxCol: 3,
+		Grid: [][]openxml.Cell{
+			{{Resolved: "Category"}, {Resolved: "PartNumber"}, {Resolved: "Total"}},
+			{{Resolved: "Hardware"}, {Resolved: "ACME_WIDGET_99"}, {Resolved: "150.00"}},
+			{{Resolved: "Tools"}, {Resolved: "DRILL-X1"}, {Resolved: "80.00"}},
+		},
+	}
+
+	// Test with composite keys: Col 0 (Category) + Col 1 (PartNumber) and Fuzzy matching enabled
+	opts := ReconcileOptions{
+		KeyColsA:       []int{0, 1},
+		ValColA:        2,
+		StartRowA:      1,
+		KeyColsB:       []int{0, 1},
+		ValColB:        2,
+		StartRowB:      1,
+		Epsilon:        0.01,
+		EnableFuzzy:    true,
+		FuzzyThreshold: 0.85,
+	}
+
+	summary := ReconcileSheetsWithOptions(sheetA, sheetB, opts)
+
+	if summary.MatchedRows != 2 {
+		t.Errorf("matched rows = %d, want 2 (1 exact + 1 fuzzy)", summary.MatchedRows)
+	}
+	if summary.FuzzyMatches != 1 {
+		t.Errorf("fuzzy matches = %d, want 1", summary.FuzzyMatches)
+	}
+	if summary.Discrepancies != 0 {
+		t.Errorf("discrepancies = %d, want 0", summary.Discrepancies)
 	}
 }

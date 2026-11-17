@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/alexandrmotologa/gridpipe/internal/audit"
 	"github.com/alexandrmotologa/gridpipe/internal/config"
 	"github.com/alexandrmotologa/gridpipe/internal/formulas"
 	"github.com/alexandrmotologa/gridpipe/internal/layout"
@@ -32,6 +33,7 @@ type NormalizedSheet struct {
 	Footnotes       []layout.FootnoteRecord      `json:"footnotes"`
 	Repairs         []formulas.FormulaRepairItem `json:"repairs"`
 	FormulasCreated int                          `json:"formulas_created"`
+	Scorecard       *audit.DataQualityScorecard  `json:"scorecard,omitempty"`
 	SourceSheet     *openxml.SheetData           `json:"-"`
 	CleanSheet      *openxml.SheetData           `json:"-"`
 }
@@ -117,6 +119,12 @@ func (p *NormalizationPipeline) ProcessWorkbook(wb *openxml.Workbook) ([]*Normal
 			numDataRows = 0
 		}
 
+		// Map rule lookup by column key
+		ruleMap := make(map[string]config.TransformationRule)
+		for _, r := range p.Config.TransformationRules {
+			ruleMap[r.ColumnKey] = r
+		}
+
 		cleanRows := make([][]string, numDataRows)
 		for r := 0; r < numDataRows; r++ {
 			origRow := bounds.MinRow + r
@@ -124,6 +132,30 @@ func (p *NormalizationPipeline) ProcessWorkbook(wb *openxml.Workbook) ([]*Normal
 			for c := 0; c < activeCols; c++ {
 				origCol := bounds.MinCol + c
 				cellVal := sheet.Grid[origRow][origCol].Resolved
+				colName := colNames[c]
+
+				// Apply transformation rules if defined for this column
+				if rule, ok := ruleMap[colName]; ok {
+					if rule.StripPrefix != "" {
+						cellVal = strings.TrimPrefix(cellVal, rule.StripPrefix)
+					}
+					if rule.StripSuffix != "" {
+						cellVal = strings.TrimSuffix(cellVal, rule.StripSuffix)
+					}
+					if rule.Trim {
+						cellVal = strings.TrimSpace(cellVal)
+					}
+					if rule.Uppercase {
+						cellVal = strings.ToUpper(cellVal)
+					} else if rule.Lowercase {
+						cellVal = strings.ToLower(cellVal)
+					}
+					if len(rule.ValueReplacements) > 0 {
+						if repl, exists := rule.ValueReplacements[cellVal]; exists {
+							cellVal = repl
+						}
+					}
+				}
 
 				// Apply type normalization
 				colType := inferredTypes[c].Type
@@ -150,7 +182,38 @@ func (p *NormalizationPipeline) ProcessWorkbook(wb *openxml.Workbook) ([]*Normal
 			}
 		}
 
-		// Create clean SheetData for export
+		// 7. Check for calculated expression columns in TransformationRules
+		calcFormulas := make(map[int]string) // colIdx -> formula pattern
+		for _, rule := range p.Config.TransformationRules {
+			if rule.CalculatedExpr != "" {
+				newColName := rule.ColumnKey
+				// Replace column names with Excel column letters in formula
+				formulaPattern := rule.CalculatedExpr
+				for cIdx, cn := range colNames {
+					token := fmt.Sprintf("{%s}", cn)
+					if strings.Contains(formulaPattern, token) {
+						colLetter := openxml.ColIndexToLetters(cIdx)
+						formulaPattern = strings.ReplaceAll(formulaPattern, token, colLetter)
+					}
+				}
+
+				newColIdx := len(colNames)
+				colNames = append(colNames, newColName)
+				inferredTypes = append(inferredTypes, types.InferredColumnType{
+					Type:       "float",
+					Confidence: 1.0,
+				})
+				calcFormulas[newColIdx] = formulaPattern
+
+				// Append empty or calculated placeholder to cleanRows
+				for r := 0; r < numDataRows; r++ {
+					cleanRows[r] = append(cleanRows[r], "CALCULATED")
+				}
+				activeCols++
+			}
+		}
+
+		// 8. Create clean SheetData for export
 		cleanSheet := &openxml.SheetData{
 			Name:    sheet.Name,
 			SheetID: sheet.SheetID,
@@ -181,15 +244,34 @@ func (p *NormalizationPipeline) ProcessWorkbook(wb *openxml.Workbook) ([]*Normal
 				if inferredTypes[c].Type == "integer" || inferredTypes[c].Type == "float" || inferredTypes[c].Type == "currency" {
 					cType = "n"
 				}
+
+				formulaStr := ""
+				if calcPattern, isCalc := calcFormulas[c]; isCalc {
+					// e.g. A * B -> A2 * B2
+					rowNum := r + 2 // 1-based header is 1, so data starts at 2
+					rowFormula := calcPattern
+					for cI := 0; cI < activeCols-1; cI++ {
+						cL := openxml.ColIndexToLetters(cI)
+						// Replace bare column letter with cell ref
+						rowFormula = strings.ReplaceAll(rowFormula, cL, fmt.Sprintf("%s%d", cL, rowNum))
+					}
+					formulaStr = rowFormula
+				}
+
 				cleanSheet.Grid[r+1][c] = openxml.Cell{
 					Ref:      openxml.CoordsToCellRef(c, r+1),
 					Col:      c,
 					Row:      r + 1,
 					Resolved: val,
+					Formula:  formulaStr,
 					Type:     cType,
 				}
 			}
 		}
+
+		// 9. Compute data quality scorecard
+		dag := formulas.BuildDAG(&openxml.Workbook{Sheets: []*openxml.SheetData{cleanSheet}})
+		scorecard := audit.ComputeScorecard(sheet, hdr, bounds, inferredTypes[:len(hdr.ColumnNames)], dag)
 
 		results = append(results, &NormalizedSheet{
 			Name:            sheet.Name,
@@ -199,6 +281,7 @@ func (p *NormalizationPipeline) ProcessWorkbook(wb *openxml.Workbook) ([]*Normal
 			Footnotes:       fnAnalysis.Footnotes,
 			Repairs:         repairs,
 			FormulasCreated: formulasCreated,
+			Scorecard:       &scorecard,
 			SourceSheet:     sheet,
 			CleanSheet:      cleanSheet,
 		})

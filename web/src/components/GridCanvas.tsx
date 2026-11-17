@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
-import { Calculator, Hash, Calendar, DollarSign, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Calculator, Hash, Calendar, DollarSign, AlertCircle, FileSpreadsheet, Check } from 'lucide-react';
 import { NormalizedSheetResult } from '../types';
 
 interface GridCanvasProps {
   normalized?: NormalizedSheetResult;
   rawPreview?: string[][];
   sheetName: string;
+  sheetIdx?: number;
+  onCellEdited?: (row: number, col: number, newVal: string) => void;
 }
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ normalized, rawPreview, sheetName }) => {
+export const GridCanvas: React.FC<GridCanvasProps> = ({
+  normalized,
+  rawPreview,
+  sheetName,
+  sheetIdx = 0,
+  onCellEdited,
+}) => {
   const [selectedCell, setSelectedCell] = useState<{ r: number; c: number } | null>({ r: 0, c: 0 });
   const [viewMode, setViewMode] = useState<'clean' | 'raw'>('clean');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const isClean = viewMode === 'clean' && normalized;
   const columns = isClean ? normalized.columns : rawPreview?.[0]?.map((_, i) => String.fromCharCode(65 + i)) || [];
@@ -26,6 +37,42 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ normalized, rawPreview, 
   const colLetter = selectedCell ? String.fromCharCode(65 + selectedCell.c) : 'A';
   const rowNumber = selectedCell ? selectedCell.r + 1 : 1;
   const cellCoord = `${colLetter}${rowNumber}`;
+
+  const handleStartEdit = (r: number, c: number, currentVal: string) => {
+    setSelectedCell({ r, c });
+    setEditValue(currentVal);
+    setIsEditing(true);
+  };
+
+  const handleCommitEdit = async () => {
+    if (!selectedCell) return;
+    setIsEditing(false);
+    setSaving(true);
+
+    try {
+      const res = await fetch('/api/cell/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheet_idx: sheetIdx,
+          row: isClean ? selectedCell.r + 1 : selectedCell.r + 1, // data row
+          col: selectedCell.c,
+          value: editValue,
+        }),
+      });
+
+      if (res.ok) {
+        if (isClean && normalized && normalized.rows[selectedCell.r]) {
+          normalized.rows[selectedCell.r][selectedCell.c] = editValue;
+        }
+        onCellEdited?.(selectedCell.r, selectedCell.c, editValue);
+      }
+    } catch (err) {
+      console.error('Failed to update cell:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-xl">
@@ -55,6 +102,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ normalized, rawPreview, 
                 Raw Input View
               </button>
             </div>
+            {saving && (
+              <span className="text-xs text-sky-400 font-mono animate-pulse">
+                Saving cell...
+              </span>
+            )}
           </div>
 
           {activeColType && (
@@ -79,10 +131,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ normalized, rawPreview, 
           <span className="text-slate-500">fx</span>
           <input
             type="text"
-            readOnly
-            value={activeVal}
+            value={isEditing ? editValue : activeVal}
+            onChange={(e) => {
+              if (isEditing) setEditValue(e.target.value);
+            }}
+            onFocus={() => {
+              if (selectedCell) handleStartEdit(selectedCell.r, selectedCell.c, activeVal);
+            }}
+            onBlur={handleCommitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCommitEdit();
+              if (e.key === 'Escape') setIsEditing(false);
+            }}
             className="flex-1 bg-transparent text-slate-200 outline-none"
-            placeholder="Selected cell value"
+            placeholder="Selected cell value (double-click to edit)"
           />
         </div>
       </div>
@@ -123,18 +185,36 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ normalized, rawPreview, 
                 {columns.map((_, cIdx) => {
                   const val = row[cIdx] || '';
                   const isSelected = selectedCell?.r === rIdx && selectedCell?.c === cIdx;
+                  const isThisEditing = isEditing && isSelected;
+
                   return (
                     <td
                       key={cIdx}
                       onClick={() => setSelectedCell({ r: rIdx, c: cIdx })}
-                      className={`border-r border-slate-800/50 p-2 cursor-pointer truncate max-w-[200px] transition-all ${
+                      onDoubleClick={() => handleStartEdit(rIdx, cIdx, val)}
+                      className={`border-r border-slate-800/50 p-2 cursor-pointer truncate max-w-[200px] transition-all relative ${
                         isSelected
                           ? 'bg-sky-500/20 ring-1 ring-inset ring-sky-400 text-white'
                           : 'text-slate-300 hover:bg-slate-800/40'
                       }`}
                       title={val}
                     >
-                      {val || <span className="text-slate-700 italic">null</span>}
+                      {isThisEditing ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCommitEdit}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleCommitEdit();
+                            if (e.key === 'Escape') setIsEditing(false);
+                          }}
+                          className="w-full bg-slate-900 text-white border border-sky-400 rounded px-1 py-0.5 outline-none font-mono text-xs"
+                        />
+                      ) : (
+                        val || <span className="text-slate-700 italic">null</span>
+                      )}
                     </td>
                   );
                 })}

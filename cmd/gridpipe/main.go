@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
+	"github.com/alexandrmotologa/gridpipe/internal/audit"
 	"github.com/alexandrmotologa/gridpipe/internal/config"
 	"github.com/alexandrmotologa/gridpipe/internal/formulas"
 	"github.com/alexandrmotologa/gridpipe/internal/layout"
@@ -16,9 +22,10 @@ import (
 	"github.com/alexandrmotologa/gridpipe/internal/reconcile"
 	"github.com/alexandrmotologa/gridpipe/internal/server"
 	"github.com/alexandrmotologa/gridpipe/internal/types"
+	"github.com/alexandrmotologa/gridpipe/internal/watcher"
 )
 
-const version = "1.0.0"
+const version = "1.1.0"
 
 func printUsage() {
 	fmt.Printf(`gridpipe %s - Autonomous Spreadsheet Normalization, Reconciliation & Formula Synthesis Engine
@@ -28,8 +35,10 @@ Usage:
 
 Available Commands:
   clean       Normalize messy multi-tier headers, dates, numbers, and synthesize formulas
-  reconcile   Cross-tab variance reconciliation with conditional formatting & audit notes
+  reconcile   Cross-tab variance reconciliation with composite keys & fuzzy matching
   formula     Scan and repair broken formula references (#REF!, #VALUE!) and audit DAG
+  audit       Compute quantitative Data Quality Scorecard (0-100) and detect anomalies
+  watch       Headless directory watcher for automated spreadsheet ingestion
   schema      Infer canonical tabular schema from workbook columns
   studio      Launch embedded React 19 Sheet Studio web interface
   version     Display engine version
@@ -53,6 +62,10 @@ func main() {
 		handleReconcileCmd(os.Args[2:])
 	case "formula":
 		handleFormulaCmd(os.Args[2:])
+	case "audit":
+		handleAuditCmd(os.Args[2:])
+	case "watch":
+		handleWatchCmd(os.Args[2:])
 	case "schema":
 		handleSchemaCmd(os.Args[2:])
 	case "studio":
@@ -103,6 +116,9 @@ func handleCleanCmd(args []string) {
 
 	for _, res := range results {
 		fmt.Printf("  -> Normalized sheet '%s': %d columns, %d data rows\n", res.Name, len(res.Columns), len(res.Rows))
+		if res.Scorecard != nil {
+			fmt.Printf("     Quality Score: %.1f/100 (Grade: %s, Anomalies: %d)\n", res.Scorecard.OverallScore, res.Scorecard.Grade, res.Scorecard.AnomaliesCount)
+		}
 		if len(res.Footnotes) > 0 {
 			fmt.Printf("     Separated %d trailing footnote/metadata line(s)\n", len(res.Footnotes))
 		}
@@ -158,10 +174,12 @@ func handleReconcileCmd(args []string) {
 	input := fs.String("i", "", "Input workbook path (.xlsx)")
 	sheetA := fs.String("sheet-a", "", "Name of baseline sheet (e.g. Budget)")
 	sheetB := fs.String("sheet-b", "", "Name of comparison sheet (e.g. Actuals)")
-	keyCol := fs.Int("k", 0, "0-based primary key column index")
+	keysFlag := fs.String("k", "0", "0-based primary key column indices (e.g. '0' or '0,1' for composite)")
 	valCol := fs.Int("v", 1, "0-based value column index")
 	output := fs.String("o", "", "Output path for reconciled workbook (.xlsx)")
 	epsilon := fs.Float64("epsilon", 0.01, "Variance tolerance threshold")
+	enableFuzzy := fs.Bool("fuzzy", true, "Enable fuzzy matching for SKU/code variations")
+	fuzzyThreshold := fs.Float64("fuzzy-threshold", 0.85, "Fuzzy match similarity threshold (0.0 to 1.0)")
 	fs.Parse(args)
 
 	if *input == "" {
@@ -197,18 +215,29 @@ func handleReconcileCmd(args []string) {
 		sB = wb.Sheets[1]
 	}
 
-	fmt.Printf("[gridpipe] Reconciling Sheet '%s' against Sheet '%s'...\n", sA.Name, sB.Name)
+	// Parse composite keys
+	keyCols := parseIndexList(*keysFlag)
+
+	fmt.Printf("[gridpipe] Reconciling Sheet '%s' against Sheet '%s' (keys: %v, fuzzy: %v)...\n", sA.Name, sB.Name, keyCols, *enableFuzzy)
 
 	hdrA := layout.DetectHeaders(sA, 5)
 	hdrB := layout.DetectHeaders(sB, 5)
 
-	summary := reconcile.ReconcileSheets(
-		sA, *keyCol, *valCol, hdrA.DataStartRow,
-		sB, *keyCol, *valCol, hdrB.DataStartRow,
-		*epsilon,
-	)
+	opts := reconcile.ReconcileOptions{
+		KeyColsA:       keyCols,
+		ValColA:        *valCol,
+		StartRowA:      hdrA.DataStartRow,
+		KeyColsB:       keyCols,
+		ValColB:        *valCol,
+		StartRowB:      hdrB.DataStartRow,
+		Epsilon:        *epsilon,
+		EnableFuzzy:    *enableFuzzy,
+		FuzzyThreshold: *fuzzyThreshold,
+	}
 
-	fmt.Printf("  -> Matched Items: %d\n", summary.MatchedRows)
+	summary := reconcile.ReconcileSheetsWithOptions(sA, sB, opts)
+
+	fmt.Printf("  -> Matched Items: %d (including %d fuzzy matches)\n", summary.MatchedRows, summary.FuzzyMatches)
 	fmt.Printf("  -> Discrepancies: %d\n", summary.Discrepancies)
 	fmt.Printf("  -> Missing in Comparison: %d\n", summary.MissingInB)
 	fmt.Printf("  -> Net Delta: %.2f\n", summary.NetDelta)
@@ -232,6 +261,120 @@ func handleReconcileCmd(args []string) {
 	}
 
 	fmt.Printf("[gridpipe] Saved auditable reconciliation report to: %s\n", outPath)
+}
+
+func handleAuditCmd(args []string) {
+	fs := flag.NewFlagSet("audit", flag.ExitOnError)
+	input := fs.String("i", "", "Input spreadsheet path (.xlsx or .csv)")
+	jsonOut := fs.String("json", "", "Optional output path for JSON scorecard")
+	sheetIdx := fs.Int("sheet", 0, "0-based worksheet index to audit")
+	fs.Parse(args)
+
+	if *input == "" {
+		fmt.Fprintln(os.Stderr, "Error: -i is required")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	wb, err := pipeline.LoadFile(*input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load input: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *sheetIdx >= len(wb.Sheets) {
+		fmt.Fprintf(os.Stderr, "Invalid sheet index %d (workbook has %d sheets)\n", *sheetIdx, len(wb.Sheets))
+		os.Exit(1)
+	}
+
+	sheet := wb.Sheets[*sheetIdx]
+	hdr := layout.DetectHeaders(sheet, 10)
+	bounds := layout.DetectTableBounds(sheet, hdr.DataStartRow)
+
+	inferredTypes := make([]types.InferredColumnType, len(hdr.ColumnNames))
+	for c := 0; c < len(hdr.ColumnNames); c++ {
+		origCol := bounds.MinCol + c
+		samples := make([]string, 0)
+		for r := bounds.MinRow; r <= bounds.MaxRow; r++ {
+			if origCol < len(sheet.Grid[r]) {
+				samples = append(samples, sheet.Grid[r][origCol].Resolved)
+			}
+		}
+		inferredTypes[c] = types.InferColumnType(samples, "auto")
+	}
+
+	dag := formulas.BuildDAG(wb)
+	scorecard := audit.ComputeScorecard(sheet, hdr, bounds, inferredTypes, dag)
+
+	fmt.Printf("\n=== Data Quality Scorecard for '%s' ===\n", sheet.Name)
+	fmt.Printf("  Overall Quality Score: %.1f / 100.0  (Grade: %s)\n", scorecard.OverallScore, scorecard.Grade)
+	fmt.Printf("  - Completeness:       %.1f%%\n", scorecard.CompletenessScore)
+	fmt.Printf("  - Type Conformance:   %.1f%%\n", scorecard.ConformanceScore)
+	fmt.Printf("  - Formula Integrity:  %.1f%%\n", scorecard.FormulaIntegrityScore)
+	fmt.Printf("  - Uniqueness:         %.1f%%\n", scorecard.UniquenessScore)
+	fmt.Printf("  Total Rows: %d | Columns: %d | Cells: %d\n", scorecard.TotalRows, scorecard.TotalColumns, scorecard.TotalCells)
+	fmt.Printf("  Anomalies Detected: %d (Duplicates: %d)\n\n", scorecard.AnomaliesCount, scorecard.DuplicateRowsCount)
+
+	if len(scorecard.Issues) > 0 {
+		fmt.Println("Detected Data Issues:")
+		for i, issue := range scorecard.Issues {
+			if i >= 10 {
+				fmt.Printf("  ... and %d more issue(s)\n", len(scorecard.Issues)-10)
+				break
+			}
+			fmt.Printf("  [%s] Cell %s (%s): %s\n", issue.Severity, issue.CellRef, issue.Category, issue.Description)
+		}
+	}
+
+	if *jsonOut != "" {
+		data, _ := json.MarshalIndent(scorecard, "", "  ")
+		_ = os.WriteFile(*jsonOut, data, 0644)
+		fmt.Printf("\n[gridpipe] Saved audit scorecard JSON to: %s\n", *jsonOut)
+	}
+}
+
+func handleWatchCmd(args []string) {
+	fs := flag.NewFlagSet("watch", flag.ExitOnError)
+	inputDir := fs.String("i", "", "Incoming directory to monitor")
+	outputDir := fs.String("o", "", "Directory to output normalized spreadsheets")
+	archiveDir := fs.String("archive", "", "Optional archive directory for raw ingested files")
+	pollInterval := fs.Duration("poll", 2*time.Second, "Directory polling frequency")
+	exportJSONL := fs.Bool("jsonl", true, "Automatically export JSONL alongside XLSX")
+	exportSQL := fs.Bool("sql", false, "Automatically export SQL schema alongside XLSX")
+	fs.Parse(args)
+
+	if *inputDir == "" || *outputDir == "" {
+		fmt.Fprintln(os.Stderr, "Error: Both -i (input dir) and -o (output dir) are required")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	opts := watcher.WatcherOptions{
+		InputDir:     *inputDir,
+		OutputDir:    *outputDir,
+		ArchiveDir:   *archiveDir,
+		PollInterval: *pollInterval,
+		ExportJSONL:  *exportJSONL,
+		ExportSQL:    *exportSQL,
+		Config:       config.DefaultPipelineConfig(),
+	}
+
+	w := watcher.NewWatcher(opts)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	if err := w.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Watcher error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func handleFormulaCmd(args []string) {
@@ -347,4 +490,19 @@ func handleStudioCmd(args []string) {
 		fmt.Fprintf(os.Stderr, "Studio server error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func parseIndexList(s string) []int {
+	parts := strings.Split(s, ",")
+	res := make([]int, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if idx, err := strconv.Atoi(p); err == nil {
+			res = append(res, idx)
+		}
+	}
+	if len(res) == 0 {
+		return []int{0}
+	}
+	return res
 }

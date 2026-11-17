@@ -11,11 +11,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alexandrmotologa/gridpipe/internal/audit"
 	"github.com/alexandrmotologa/gridpipe/internal/config"
 	"github.com/alexandrmotologa/gridpipe/internal/formulas"
+	"github.com/alexandrmotologa/gridpipe/internal/layout"
 	"github.com/alexandrmotologa/gridpipe/internal/openxml"
 	"github.com/alexandrmotologa/gridpipe/internal/pipeline"
 	"github.com/alexandrmotologa/gridpipe/internal/reconcile"
+	"github.com/alexandrmotologa/gridpipe/internal/types"
 )
 
 // WorkbookStore holds state in memory for active studio sessions.
@@ -39,6 +42,8 @@ func RegisterRoutes(mux *http.ServeMux, hub *SSEHub) {
 	mux.HandleFunc("/api/reconcile", handleReconcile(hub))
 	mux.HandleFunc("/api/formulas/repair", handleRepair(hub))
 	mux.HandleFunc("/api/dag", handleGetDAG)
+	mux.HandleFunc("/api/audit", handleAudit)
+	mux.HandleFunc("/api/cell/edit", handleCellEdit)
 	mux.HandleFunc("/api/export", handleExport)
 	mux.HandleFunc("/api/stream", hub.HandleSSE)
 }
@@ -221,14 +226,18 @@ func handleReconcile(hub *SSEHub) http.HandlerFunc {
 		}
 
 		type ReconcileReq struct {
-			SheetA   string  `json:"sheet_a"`
-			SheetB   string  `json:"sheet_b"`
-			KeyColA  int     `json:"key_col_a"`
-			ValColA  int     `json:"val_col_a"`
-			KeyColB  int     `json:"key_col_b"`
-			ValColB  int     `json:"val_col_b"`
-			StartRow int     `json:"start_row"`
-			Epsilon  float64 `json:"epsilon"`
+			SheetA         string  `json:"sheet_a"`
+			SheetB         string  `json:"sheet_b"`
+			KeyColsA       []int   `json:"key_cols_a"`
+			KeyColA        int     `json:"key_col_a"` // backwards compatibility
+			ValColA        int     `json:"val_col_a"`
+			KeyColsB       []int   `json:"key_cols_b"`
+			KeyColB        int     `json:"key_col_b"` // backwards compatibility
+			ValColB        int     `json:"val_col_b"`
+			StartRow       int     `json:"start_row"`
+			Epsilon        float64 `json:"epsilon"`
+			EnableFuzzy    bool    `json:"enable_fuzzy"`
+			FuzzyThreshold float64 `json:"fuzzy_threshold"`
 		}
 
 		var req ReconcileReq
@@ -261,18 +270,34 @@ func handleReconcile(hub *SSEHub) http.HandlerFunc {
 			sB = wb.Sheets[1]
 		}
 
+		keyColsA := req.KeyColsA
+		if len(keyColsA) == 0 {
+			keyColsA = []int{req.KeyColA}
+		}
+		keyColsB := req.KeyColsB
+		if len(keyColsB) == 0 {
+			keyColsB = []int{req.KeyColB}
+		}
+
 		hub.Broadcast(pipeline.PipelineEvent{
 			Stage:       "RECONCILE_START",
 			ProgressPct: 30,
-			Message:     fmt.Sprintf("Reconciling '%s' against '%s'", sA.Name, sB.Name),
+			Message:     fmt.Sprintf("Reconciling '%s' against '%s' (fuzzy: %v)", sA.Name, sB.Name, req.EnableFuzzy),
 		})
 
-		summary := reconcile.ReconcileSheets(
-			sA, req.KeyColA, req.ValColA, req.StartRow,
-			sB, req.KeyColB, req.ValColB, req.StartRow,
-			req.Epsilon,
-		)
+		opts := reconcile.ReconcileOptions{
+			KeyColsA:       keyColsA,
+			ValColA:        req.ValColA,
+			StartRowA:      req.StartRow,
+			KeyColsB:       keyColsB,
+			ValColB:        req.ValColB,
+			StartRowB:      req.StartRow,
+			Epsilon:        req.Epsilon,
+			EnableFuzzy:    req.EnableFuzzy,
+			FuzzyThreshold: req.FuzzyThreshold,
+		}
 
+		summary := reconcile.ReconcileSheetsWithOptions(sA, sB, opts)
 		reconciledSheet := reconcile.GenerateReconciledSheet(summary, "AuditReport")
 
 		reconciledWB := &openxml.Workbook{
@@ -288,13 +313,120 @@ func handleReconcile(hub *SSEHub) http.HandlerFunc {
 		hub.Broadcast(pipeline.PipelineEvent{
 			Stage:       "RECONCILE_COMPLETE",
 			ProgressPct: 100,
-			Message:     fmt.Sprintf("Reconciliation complete: %d matched, %d variances", summary.MatchedRows, summary.Discrepancies),
+			Message:     fmt.Sprintf("Reconciliation complete: %d matched (%d fuzzy), %d variances", summary.MatchedRows, summary.FuzzyMatches, summary.Discrepancies),
 			Details:     summary,
 		})
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(summary)
 	}
+}
+
+func handleAudit(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+
+	store.mu.RLock()
+	wb := store.ActiveWB
+	store.mu.RUnlock()
+
+	if wb == nil || len(wb.Sheets) == 0 {
+		http.Error(w, "No active workbook loaded", http.StatusBadRequest)
+		return
+	}
+
+	sheetIdx := 0
+	if idxStr := r.URL.Query().Get("sheet"); idxStr != "" {
+		if idx, err := strconv.Atoi(idxStr); err == nil && idx < len(wb.Sheets) {
+			sheetIdx = idx
+		}
+	}
+
+	sheet := wb.Sheets[sheetIdx]
+	hdr := layout.DetectHeaders(sheet, 10)
+	bounds := layout.DetectTableBounds(sheet, hdr.DataStartRow)
+
+	inferredTypes := make([]types.InferredColumnType, len(hdr.ColumnNames))
+	for c := 0; c < len(hdr.ColumnNames); c++ {
+		origCol := bounds.MinCol + c
+		samples := make([]string, 0)
+		for r := bounds.MinRow; r <= bounds.MaxRow; r++ {
+			if origCol < len(sheet.Grid[r]) {
+				samples = append(samples, sheet.Grid[r][origCol].Resolved)
+			}
+		}
+		inferredTypes[c] = types.InferColumnType(samples, "auto")
+	}
+
+	dag := formulas.BuildDAG(wb)
+	scorecard := audit.ComputeScorecard(sheet, hdr, bounds, inferredTypes, dag)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(scorecard)
+}
+
+func handleCellEdit(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type CellEditReq struct {
+		SheetIdx int    `json:"sheet_idx"`
+		Row      int    `json:"row"`
+		Col      int    `json:"col"`
+		Value    string `json:"value"`
+		Formula  string `json:"formula,omitempty"`
+	}
+
+	var req CellEditReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if store.ActiveWB == nil || req.SheetIdx >= len(store.ActiveWB.Sheets) {
+		http.Error(w, "Invalid sheet index", http.StatusBadRequest)
+		return
+	}
+
+	sheet := store.ActiveWB.Sheets[req.SheetIdx]
+	if req.Row < 0 || req.Row >= sheet.MaxRow || req.Col < 0 || req.Col >= sheet.MaxCol {
+		http.Error(w, "Cell coordinates out of bounds", http.StatusBadRequest)
+		return
+	}
+
+	cell := &sheet.Grid[req.Row][req.Col]
+	cell.Resolved = req.Value
+	cell.RawValue = req.Value
+	if req.Formula != "" {
+		cell.Formula = req.Formula
+	}
+
+	// Update normalized representation if present
+	if store.Normalized != nil && req.SheetIdx < len(store.Normalized) {
+		norm := store.Normalized[req.SheetIdx]
+		if req.Row < len(norm.Rows) && req.Col < len(norm.Columns) {
+			norm.Rows[req.Row][req.Col] = req.Value
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":   "updated",
+		"cell_ref": cell.Ref,
+		"value":    cell.Resolved,
+		"formula":  cell.Formula,
+	})
 }
 
 func handleRepair(hub *SSEHub) http.HandlerFunc {

@@ -14,8 +14,10 @@ gridpipe processes irregular enterprise spreadsheets in Excel (.xlsx) and CSV fo
 4. Formula Synthesis: Generates dynamic Excel formulas (=SUM, =AVERAGE, =XLOOKUP, =IFERROR) directly into OpenXML calculation nodes for summary totals.
 5. Reference Repair: Scans workbooks for corrupted references (#REF!, #VALUE!, #DIV/0!) and reconstructs valid range bounds.
 6. Calculation DAG: Builds a directed acyclic graph of cell dependencies, checks for circular references, and computes topological evaluation order.
-7. Cross-Tab Reconciliation: Compares corresponding line items across two worksheets, calculates item variances and percentage deltas, and injects soft green/red conditional styling with audit notes.
-8. React 19 Sheet Studio: In-browser workbench with virtualized data grid, schema alignment mapper, interactive formula DAG visualizer, variance heatmaps, and real-time execution stream via Server-Sent Events (SSE).
+7. Intelligent Cross-Tab Reconciliation: Aligns corresponding line items across two worksheets using composite keys (-k 0,1) and fuzzy string similarity (Jaro-Winkler / Levenshtein), computing deltas and applying conditional formatting.
+8. Autonomous Quality & Anomaly Audit: Detects statistical outliers (IQR), duplicate rows, and sign inversions, computing a quantitative Data Quality Scorecard (0-100, Grade A-F).
+9. Headless Folder Watcher: Automatically ingests, cleans, reconciles, and exports spreadsheets dropping into watched directories without manual intervention.
+10. React 19 Sheet Studio: In-browser workbench with virtualized data grid, inline cell editing, schema alignment mapper, interactive formula DAG visualizer, quality scorecard, variance heatmaps, and real-time execution stream via Server-Sent Events (SSE).
 
 ## Installation
 
@@ -59,18 +61,40 @@ Output:
 - Synthesizes `=IFERROR(SUM(...), 0)` on the total row.
 - Exports clean Excel, JSONL, and SQL table schemas.
 
-### 2. Reconcile Cross-Tab Variances
+### 2. Reconcile Cross-Tab Variances with Fuzzy Matching & Composite Keys
 
 ```bash
-gridpipe reconcile -i examples/messy_sheets/multi_tier_pnl.xlsx --sheet-a Budget_2025 --sheet-b Actuals_2025 -k 0 -v 1 -o pnl_reconciled.xlsx
+gridpipe reconcile -i examples/messy_sheets/multi_tier_pnl.xlsx --sheet-a Budget_2025 --sheet-b Actuals_2025 -k 0 -v 1 --fuzzy --fuzzy-threshold 0.85 -o pnl_reconciled.xlsx
 ```
 
 Output:
-- Aligns line items between Budget and Actuals by Cost Code.
-- Generates a `Reconciliation_Audit` worksheet with delta formulas `=C2-B2` and percentage deltas.
+- Aligns line items between Budget and Actuals by single or composite keys (-k 0,1).
+- Matches near-identical codes or vendor descriptions via Jaro-Winkler similarity (e.g. 85% threshold).
+- Generates a `Reconciliation_Audit` worksheet with delta formulas `=G2-F2` and percentage deltas.
 - Applies conditional formatting: Soft green for matches, soft red for variances exceeding threshold.
 
-### 3. Repair Broken Formulas and Validate DAG
+### 3. Compute Data Quality Scorecard & Detect Anomalies
+
+```bash
+gridpipe audit -i examples/messy_sheets/messy_supplier_invoice.xlsx --json scorecard.json
+```
+
+Output:
+- Calculates overall quality score (0-100) and grade (A to F) across 4 pillars: Completeness, Type Conformance, Formula Integrity, and Uniqueness.
+- Detects statistical outliers (IQR), duplicate rows, and sign inversion errors.
+
+### 4. Headless Automated Directory Watcher
+
+```bash
+gridpipe watch -i ./incoming_drop -o ./audited_spreadsheets --archive ./archive --poll 2s --jsonl
+```
+
+Output:
+- Continuously monitors incoming directories for `.xlsx` and `.csv` drops.
+- Normalizes headers, repairs formulas, and exports clean spreadsheets and JSONL streams.
+- Archives raw files to maintain end-to-end data lineage.
+
+### 5. Repair Broken Formulas and Validate DAG
 
 ```bash
 gridpipe formula -i examples/messy_sheets/broken_formulas.xlsx --repair --dag -o healed.xlsx
@@ -81,13 +105,13 @@ Output:
 - Wraps arithmetic in `IFERROR(..., 0)` to prevent division errors.
 - Validates the calculation DAG and confirms acyclicity.
 
-### 4. Infer Canonical Schema
+### 6. Infer Canonical Schema
 
 ```bash
 gridpipe schema -i examples/messy_sheets/messy_supplier_invoice.xlsx
 ```
 
-### 5. Launch Interactive React 19 Sheet Studio
+### 7. Launch Interactive React 19 Sheet Studio
 
 ```bash
 gridpipe studio --port 7575

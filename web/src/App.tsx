@@ -12,18 +12,20 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { GridCanvas } from './components/GridCanvas';
 import { SchemaMapper } from './components/SchemaMapper';
 import { FormulaDagView } from './components/FormulaDagView';
 import { VarianceHeatmap } from './components/VarianceHeatmap';
+import { AuditScorecard } from './components/AuditScorecard';
 import { PipelineStream } from './components/PipelineStream';
 import { SheetOverview, NormalizedSheetResult, ReconciliationReport, PipelineStreamEvent } from './types';
 
 export const App: React.FC = () => {
   const [sheets, setSheets] = useState<SheetOverview[]>([]);
   const [activeSheetIdx, setActiveSheetIdx] = useState(0);
-  const [activeTab, setActiveTab] = useState<'grid' | 'schema' | 'dag' | 'variance'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'schema' | 'dag' | 'variance' | 'audit'>('grid');
   const [fileName, setFileName] = useState<string>('');
   const [normalized, setNormalized] = useState<NormalizedSheetResult[]>([]);
   const [reconciliationReport, setReconciliationReport] = useState<ReconciliationReport | null>(null);
@@ -152,9 +154,11 @@ export const App: React.FC = () => {
   const handleRunReconcile = async (
     sA: string,
     sB: string,
-    kCol: number,
+    keyCols: number[],
     vCol: number,
-    eps: number
+    eps: number,
+    enableFuzzy: boolean,
+    fuzzyThreshold: number
   ) => {
     setLoading(true);
     setStreamOpen(true);
@@ -165,19 +169,21 @@ export const App: React.FC = () => {
         body: JSON.stringify({
           sheet_a: sA,
           sheet_b: sB,
-          key_col_a: kCol,
+          key_cols_a: keyCols,
           val_col_a: vCol,
-          key_col_b: kCol,
+          key_cols_b: keyCols,
           val_col_b: vCol,
           start_row: 1,
           epsilon: eps,
+          enable_fuzzy: enableFuzzy,
+          fuzzy_threshold: fuzzyThreshold,
         }),
       });
 
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setReconciliationReport(data);
-      showToast('Reconciliation complete! Report and formulas generated.');
+      showToast(`Reconciliation complete! Matched ${data.matched_rows} items.`);
     } catch (err: any) {
       showToast(err.message || 'Reconciliation failed', 'error');
     } finally {
@@ -221,7 +227,7 @@ export const App: React.FC = () => {
             </div>
             <span>gridpipe</span>
             <span className="text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
-              Sheet Studio
+              Sheet Studio v1.1
             </span>
           </div>
 
@@ -270,6 +276,15 @@ export const App: React.FC = () => {
           >
             <GitCompare className="w-3.5 h-3.5" />
             Reconciliation
+          </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              activeTab === 'audit' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Quality & Audit
           </button>
         </div>
 
@@ -408,6 +423,7 @@ export const App: React.FC = () => {
             {activeTab === 'grid' && (
               <GridCanvas
                 sheetName={currentSheet?.name || 'Sheet'}
+                sheetIdx={activeSheetIdx}
                 normalized={currentNormalized}
                 rawPreview={currentSheet?.preview}
               />
@@ -423,6 +439,9 @@ export const App: React.FC = () => {
                 report={reconciliationReport}
                 loading={loading}
               />
+            )}
+            {activeTab === 'audit' && (
+              <AuditScorecard sheetIdx={activeSheetIdx} />
             )}
           </>
         )}
