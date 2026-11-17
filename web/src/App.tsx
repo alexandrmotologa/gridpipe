@@ -200,101 +200,119 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      {/* Toast Notification */}
+      {/* Toast Notification (Bottom Right so it never overlaps header controls) */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-lg border text-xs font-medium shadow-2xl flex items-center gap-2 transition-all ${
+          className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg border text-xs font-medium shadow-2xl flex items-center gap-2 transition-all animate-in fade-in slide-in-from-bottom-2 ${
             toast.type === 'success'
-              ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/30'
-              : 'bg-rose-950/90 text-rose-300 border-rose-500/30'
+              ? 'bg-emerald-950/95 text-emerald-300 border-emerald-500/30 shadow-emerald-950/50'
+              : 'bg-rose-950/95 text-rose-300 border-rose-500/30 shadow-rose-950/50'
           }`}
         >
           {toast.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-rose-400" />
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           )}
-          {toast.msg}
+          <span className="whitespace-nowrap">{toast.msg}</span>
         </div>
       )}
 
       {/* Top Main Navigation Bar */}
-      <header className="h-14 border-b border-slate-800 bg-slate-950/80 backdrop-blur px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
+      <header className="h-14 border-b border-slate-800 bg-slate-950/95 backdrop-blur px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2 sm:gap-4 select-none">
+        {/* Left Section: Brand & Active File */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="flex items-center gap-2 font-bold tracking-tight text-white text-base">
-            <div className="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-sky-500/20">
+          <div className="flex items-center gap-2 font-bold tracking-tight text-white text-sm shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-black shadow-md shadow-sky-500/20 shrink-0">
               G
             </div>
-            <span className="hidden xs:inline">gridpipe</span>
-            <span className="hidden sm:inline text-[10px] text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded font-mono font-normal">
+            <span className="whitespace-nowrap font-bold">gridpipe</span>
+            <span className="text-[10px] font-mono font-medium text-sky-400 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded whitespace-nowrap">
               v1.1
             </span>
           </div>
 
           {fileName && (
-            <div className="hidden md:flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1 rounded-full text-slate-300">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
-              <span className="truncate max-w-[160px] lg:max-w-[240px]">{fileName}</span>
+            <div className="hidden 2xl:flex items-center gap-1.5 text-xs bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full text-slate-300 max-w-[180px] shrink-0">
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="truncate whitespace-nowrap font-mono text-[11px]">{fileName}</span>
             </div>
           )}
         </div>
 
-        {/* Center Navigation Tabs */}
-        <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/80 border border-slate-800 p-1 rounded-lg text-xs overflow-x-auto scrollbar-none max-w-full">
+        {/* Center Section: Navigation Tabs */}
+        <nav className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-1 rounded-lg text-xs shrink-0 whitespace-nowrap">
           <button
             onClick={() => setActiveTab('grid')}
-            title="Grid Canvas"
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
-              activeTab === 'grid' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            title="Grid Canvas (Normalized Table)"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors text-xs font-medium shrink-0 ${
+              activeTab === 'grid'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Grid Canvas</span>
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span>Grid</span>
+            <span className="hidden 2xl:inline">Canvas</span>
           </button>
+
           <button
             onClick={() => setActiveTab('schema')}
-            title="Schema Alignment"
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
-              activeTab === 'schema' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            title="Schema Alignment & Type Definitions"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors text-xs font-medium shrink-0 ${
+              activeTab === 'schema'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Schema</span>
+            <Sliders className="w-3.5 h-3.5 shrink-0" />
+            <span>Schema</span>
           </button>
+
           <button
             onClick={() => setActiveTab('dag')}
-            title="Formula DAG"
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
-              activeTab === 'dag' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            title="Formula Dependency DAG & Cycle Detection"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors text-xs font-medium shrink-0 ${
+              activeTab === 'dag'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
-            <GitCommit className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Formula DAG</span>
+            <GitCommit className="w-3.5 h-3.5 shrink-0" />
+            <span>DAG</span>
+            <span className="hidden 2xl:inline">Formulas</span>
           </button>
+
           <button
             onClick={() => setActiveTab('variance')}
-            title="Reconciliation"
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
-              activeTab === 'variance' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            title="Cross-Tab Variance Reconciliation"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors text-xs font-medium shrink-0 ${
+              activeTab === 'variance'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
-            <GitCompare className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Reconciliation</span>
+            <GitCompare className="w-3.5 h-3.5 shrink-0" />
+            <span>Reconcile</span>
           </button>
+
           <button
             onClick={() => setActiveTab('audit')}
-            title="Quality & Audit"
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors shrink-0 ${
-              activeTab === 'audit' ? 'bg-sky-600 text-white font-medium shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            title="Data Quality & Compliance Scorecard"
+            className={`whitespace-nowrap flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors text-xs font-medium shrink-0 ${
+              activeTab === 'audit'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Quality & Audit</span>
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            <span>Audit</span>
+            <span className="hidden 2xl:inline">Score</span>
           </button>
-        </div>
+        </nav>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Right Section: Action Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap">
           <input
             type="file"
             ref={fileInputRef}
@@ -302,68 +320,69 @@ export const App: React.FC = () => {
             accept=".xlsx,.csv"
             className="hidden"
           />
+
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors"
-            title="Upload File"
+            className="whitespace-nowrap px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0"
+            title="Upload Spreadsheet (.xlsx or .csv)"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Upload</span>
           </button>
 
           <button
             onClick={handleRunClean}
             disabled={loading || sheets.length === 0}
-            className="px-2.5 sm:px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-600/20"
-            title="Normalize & Synthesize Formulas"
+            className="whitespace-nowrap px-3 sm:px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-sky-600/20 shrink-0"
+            title="Normalize headers, format dates/numbers, and synthesize native formulas"
           >
-            <Play className="w-3.5 h-3.5 fill-white" />
-            <span className="hidden sm:inline">Normalize</span>
+            <Play className="w-3.5 h-3.5 fill-white shrink-0" />
+            <span>Normalize</span>
           </button>
 
           <button
             onClick={handleRunRepair}
             disabled={loading || sheets.length === 0}
-            className="px-2 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-md text-xs flex items-center gap-1.5 transition-colors"
-            title="Scan and heal broken references (#REF!, #VALUE!)"
+            className="whitespace-nowrap px-2 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0"
+            title="Scan and heal corrupted formula references (#REF!, #VALUE!)"
           >
-            <Wrench className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden lg:inline">Heal</span>
+            <Wrench className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="hidden md:inline">Heal</span>
           </button>
 
           {/* Export Dropdown */}
-          <div className="relative group">
+          <div className="relative group shrink-0">
             <button
               disabled={sheets.length === 0}
-              className="px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 rounded-md text-xs font-medium flex items-center gap-1.5"
-              title="Export Data"
+              className="whitespace-nowrap px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700/80 rounded-md text-xs font-medium flex items-center gap-1.5 shrink-0"
+              title="Export audited workbook or data format"
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <Download className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               <span className="hidden sm:inline">Export</span>
             </button>
             <div className="absolute right-0 top-full mt-1 hidden group-hover:block bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 w-44 z-40 text-xs">
               <button
                 onClick={() => handleExport('xlsx')}
-                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 whitespace-nowrap"
               >
                 <span>Audited Excel (.xlsx)</span>
               </button>
               <button
                 onClick={() => handleExport('csv')}
-                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 whitespace-nowrap"
               >
                 <span>Relational CSV (.csv)</span>
               </button>
               <button
                 onClick={() => handleExport('jsonl')}
-                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 whitespace-nowrap"
               >
                 <span>JSON Lines (.jsonl)</span>
               </button>
               <button
                 onClick={() => handleExport('sql')}
-                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 whitespace-nowrap"
               >
                 <span>SQL Schema & Inserts</span>
               </button>
@@ -372,36 +391,36 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setStreamOpen(!streamOpen)}
-            className={`p-1.5 rounded-md border text-xs transition-colors ${
+            className={`p-1.5 rounded-md border text-xs transition-colors shrink-0 ${
               streamOpen
                 ? 'bg-sky-500/20 text-sky-400 border-sky-500/40'
                 : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
             }`}
-            title="Toggle Live Execution Stream"
+            title="Toggle Live Pipeline Execution Stream"
           >
-            <Activity className="w-4 h-4" />
+            <Activity className="w-4 h-4 shrink-0" />
           </button>
         </div>
       </header>
 
       {/* Sheets Tab Bar (if multi-sheet workbook) */}
       {sheets.length > 0 && (
-        <div className="h-9 bg-slate-950 border-b border-slate-800/80 px-4 flex items-center gap-2 shrink-0 overflow-x-auto text-xs">
-          <span className="text-slate-500 text-[11px] font-semibold uppercase tracking-wider mr-1">
+        <div className="h-9 bg-slate-950 border-b border-slate-800/80 px-4 flex items-center gap-2 shrink-0 overflow-x-auto scrollbar-none text-xs">
+          <span className="text-slate-500 text-[11px] font-semibold uppercase tracking-wider mr-1 whitespace-nowrap shrink-0">
             Worksheets:
           </span>
           {sheets.map((s, idx) => (
             <button
               key={s.name}
               onClick={() => setActiveSheetIdx(idx)}
-              className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 font-mono ${
+              className={`px-3 py-1 rounded transition-colors flex items-center gap-1.5 font-mono whitespace-nowrap shrink-0 ${
                 activeSheetIdx === idx
                   ? 'bg-slate-800 text-sky-400 font-semibold border-b-2 border-sky-500'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <FileSpreadsheet className="w-3 h-3" />
-              {s.name}
+              <FileSpreadsheet className="w-3 h-3 shrink-0" />
+              <span>{s.name}</span>
             </button>
           ))}
         </div>

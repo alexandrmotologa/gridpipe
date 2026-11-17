@@ -78,16 +78,16 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
     <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-xl">
       {/* Top Toolbar & Formula Bar */}
       <div className="bg-slate-950 border-b border-slate-800 p-2.5 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1">
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              {sheetName}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center gap-1 whitespace-nowrap shrink-0">
+              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              <span>{sheetName}</span>
             </span>
-            <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-800 text-xs">
+            <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-800 text-xs shrink-0 whitespace-nowrap">
               <button
                 onClick={() => setViewMode('clean')}
-                className={`px-2.5 py-1 rounded transition-colors ${
+                className={`px-2.5 py-1 rounded transition-colors whitespace-nowrap shrink-0 ${
                   viewMode === 'clean' ? 'bg-sky-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -95,7 +95,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('raw')}
-                className={`px-2.5 py-1 rounded transition-colors ${
+                className={`px-2.5 py-1 rounded transition-colors whitespace-nowrap shrink-0 ${
                   viewMode === 'raw' ? 'bg-sky-600 text-white font-medium' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -103,20 +103,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({
               </button>
             </div>
             {saving && (
-              <span className="text-xs text-sky-400 font-mono animate-pulse">
+              <span className="text-xs text-sky-400 font-mono animate-pulse whitespace-nowrap shrink-0">
                 Saving cell...
               </span>
             )}
           </div>
 
           {activeColType && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-400">Column Type:</span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+            <div className="flex items-center gap-2 text-xs shrink-0 whitespace-nowrap">
+              <span className="text-slate-400 whitespace-nowrap">Column Type:</span>
+              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono whitespace-nowrap">
                 {activeColType.type.toUpperCase()}
                 {activeColType.currency_code && ` (${activeColType.currency_code})`}
               </span>
-              <span className="text-slate-500 text-[11px]">
+              <span className="text-slate-500 text-[11px] whitespace-nowrap">
                 {Math.round(activeColType.confidence * 100)}% confidence
               </span>
             </div>
